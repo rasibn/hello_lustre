@@ -9,17 +9,14 @@ import lustre/element/html as h
 import lustre/event as e
 import lustre_http
 
-// A model produces a view
 pub type Model {
   Model(count: Int, cats: List(String))
 }
 
-// The view can produce messages in response to user interaction
 fn init(_flags) -> #(Model, effect.Effect(Msg)) {
   #(Model(0, []), effect.none())
 }
 
-// The possible messages
 pub type Msg {
   UserIncrementedCount
   UserDecrementedCount
@@ -48,7 +45,6 @@ fn get_cat() {
   lustre_http.get("https://cataas.com/cat?json=true", expect)
 }
 
-// The view can produce messages in response to user interaction
 pub fn view(model: Model) -> el.Element(Msg) {
   h.div([], [
     h.button([e.on_click(UserIncrementedCount)], [el.text("+")]),
@@ -66,6 +62,5 @@ pub fn view(model: Model) -> el.Element(Msg) {
 pub fn main() {
   let app = l.application(init, update, view)
   let assert Ok(_) = l.start(app, "#app", Nil)
-
   Nil
 }
