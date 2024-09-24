@@ -1,40 +1,71 @@
+import gleam/dynamic
 import gleam/int
+import gleam/list
 import lustre as l
+import lustre/attribute as a
+import lustre/effect
 import lustre/element as el
 import lustre/element/html as h
 import lustre/event as e
+import lustre_http
 
-// import lustre/attribute as a
-
-pub type Model =
-  Int
-
-fn init(_flags) -> Model {
-  0
+// A model produces a view
+pub type Model {
+  Model(count: Int, cats: List(String))
 }
 
+// The view can produce messages in response to user interaction
+fn init(_flags) -> #(Model, effect.Effect(Msg)) {
+  #(Model(0, []), effect.none())
+}
+
+// The possible messages
 pub type Msg {
-  Increment
-  Decrement
+  UserIncrementedCount
+  UserDecrementedCount
+  ApiReturnedCat(Result(String, lustre_http.HttpError))
 }
 
-pub fn update(model: Model, msg: Msg) -> Model {
+// Those messages are passed to the update function to produce a new model
+pub fn update(model: Model, msg: Msg) {
   case msg {
-    Increment -> model + 1
-    Decrement -> model - 1
+    UserIncrementedCount -> #(Model(..model, count: model.count + 1), get_cat())
+    UserDecrementedCount -> #(
+      Model(..model, count: model.count - 1),
+      effect.none(),
+    )
+    ApiReturnedCat(Ok(cat)) -> #(
+      Model(..model, cats: [cat, ..model.cats]),
+      effect.none(),
+    )
+    ApiReturnedCat(Error(_)) -> #(model, effect.none())
   }
 }
 
+fn get_cat() {
+  let decoder = dynamic.field("_id", dynamic.string)
+  let expect = lustre_http.expect_json(decoder, ApiReturnedCat)
+  lustre_http.get("https://cataas.com/cat?json=true", expect)
+}
+
+// The view can produce messages in response to user interaction
 pub fn view(model: Model) -> el.Element(Msg) {
-  let count = int.to_string(model)
   h.div([], [
-    h.button([e.on_click(Increment)], [el.text("+")]),
-    el.text(count),
-    h.button([e.on_click(Decrement)], [el.text("-")]),
+    h.button([e.on_click(UserIncrementedCount)], [el.text("+")]),
+    el.text(model.count |> int.to_string),
+    h.button([e.on_click(UserDecrementedCount)], [el.text("-")]),
+    h.div(
+      [],
+      list.map(model.cats, fn(cat) {
+        h.img([a.src("https://cataas.com/cat/" <> cat)])
+      }),
+    ),
   ])
 }
 
 pub fn main() {
-  let app = l.simple(init, update, view)
+  let app = l.application(init, update, view)
   let assert Ok(_) = l.start(app, "#app", Nil)
+
+  Nil
 }
